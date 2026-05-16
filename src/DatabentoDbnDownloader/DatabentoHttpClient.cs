@@ -1,0 +1,24 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+
+internal static class DatabentoHttpClient
+{
+    public static HttpClient Create(string apiKey)
+    {
+        var client = new HttpClient(new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.All,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10)
+        })
+        {
+            BaseAddress = new Uri("https://hist.databento.com/v0/"),
+            Timeout = TimeSpan.FromMinutes(10)
+        };
+
+        var raw = Encoding.ASCII.GetBytes($"{apiKey}:");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(raw));
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("DatabentoDbnDownloader/1.0 (+https://chat.openai.com)");
+        return client;
+    }
+}
