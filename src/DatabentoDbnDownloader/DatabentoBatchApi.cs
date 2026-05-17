@@ -41,6 +41,54 @@ internal sealed class DatabentoBatchApi(HttpClient client, ILogger<DatabentoBatc
         return files;
     }
 
+    /// <summary>
+    /// POST symbology.resolve — translates one symbol from stype_in to stype_out for the given
+    /// dataset/date range. Returns the resolved string for the first interval covering startDate,
+    /// or null if the API gave no result.
+    /// </summary>
+    public async Task<string?> ResolveSymbolAsync(
+        string dataset, string symbol, string stypeIn, string stypeOut,
+        DateOnly startDate, DateOnly endDateExclusive)
+    {
+        logger.LogInformation("POST symbology.resolve symbol={Symbol} {In}->{Out} {Start}..{End}",
+            symbol, stypeIn, stypeOut, startDate, endDateExclusive);
+        var sw = Stopwatch.StartNew();
+
+        var content = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("dataset", dataset),
+            new KeyValuePair<string, string>("symbols", symbol),
+            new KeyValuePair<string, string>("stype_in", stypeIn),
+            new KeyValuePair<string, string>("stype_out", stypeOut),
+            new KeyValuePair<string, string>("start_date", startDate.ToString("yyyy-MM-dd")),
+            new KeyValuePair<string, string>("end_date", endDateExclusive.ToString("yyyy-MM-dd"))
+        });
+
+        using var response = await client.PostAsync("symbology.resolve", content);
+        var body = await response.Content.ReadAsStringAsync();
+        sw.Stop();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogError("symbology.resolve failed: HTTP {Status} body={Body}", (int)response.StatusCode, body);
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(body);
+        if (!doc.RootElement.TryGetProperty("result", out var result)) return null;
+        if (!result.TryGetProperty(symbol, out var mappings)) return null;
+        foreach (var interval in mappings.EnumerateArray())
+        {
+            if (interval.TryGetProperty("s", out var s))
+            {
+                var raw = s.GetString();
+                logger.LogInformation("  -> resolved {Symbol} -> {Raw} ({Elapsed:F0}ms)", symbol, raw, sw.Elapsed.TotalMilliseconds);
+                return raw;
+            }
+        }
+        return null;
+    }
+
     public async Task<long> DownloadFileAsync(string url, string path, long? expectedSize = null)
     {
         var fileName = Path.GetFileName(path);
