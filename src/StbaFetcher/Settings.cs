@@ -1,7 +1,7 @@
 using System.Globalization;
 using SquidEyes.Pricing;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 /// <summary>Parsed command-line arguments for the DBN downloader CLI.</summary>
 internal sealed class Settings
@@ -14,6 +14,7 @@ internal sealed class Settings
     public DateOnly Until { get; private init; }
     public string SaveTo { get; private init; } = PathTokens.Expand(DefaultSaveTo);
     public int Threads { get; private init; } = DefaultThreads;
+    public bool All { get; private init; }
     public bool Overwrite { get; private init; }
     public bool Verbose { get; private init; }
     public bool ShowHelp { get; private init; }
@@ -21,7 +22,7 @@ internal sealed class Settings
 
     public static string HelpText =>
         $$"""
-        DatabentoDbnDownloader — fetch CME futures MBP-1 from Databento and emit STBA + STBA.CSV.
+        StbaFetcher — fetch CME futures MBP-1 from Databento and emit STBA + STBA.CSV.
 
         For each (symbol, trade-date) the tool produces four files:
           {Symbol}_{yyyyMMdd}_{Contract}_DB_MTH_ET.stba       (08:00..12:00 ET)
@@ -32,18 +33,17 @@ internal sealed class Settings
         Output is laid out as {SaveTo}/{Symbol}/{Year}/<filename>.
 
         Usage:
-          DatabentoDbnDownloader --symbols <list> [--from <date>] [--until <date>] [options]
-          DatabentoDbnDownloader --set-key <db-...>
+          StbaFetcher --symbols <list> [options]
+          StbaFetcher --set-key <db-...>
 
         Required:
-          --symbols <list>   Comma-separated root symbols (ES, NQ, CL, GC, TY, FV, US, JY, EU, BP).
-                             Continuous front month (.c.0) is implied.
+          --symbols <list>   Comma-separated root symbols (ES, NQ, CL, GC, TY, FV, US, JY, EU, BP),
+                             or 'ALL' to expand to every supported symbol. Mixed lists like
+                             'ALL,NQ' are deduped. Continuous front month (.c.0) is implied.
 
         Options:
-          --from <date>      Inclusive ET trade-date, yyyy-MM-dd. Must be a valid trade date.
-                             Default: the earliest supported trade date.
-          --until <date>     Inclusive ET trade-date, yyyy-MM-dd. Must be a valid trade date.
-                             Default: yesterday's trade date (latest trade date strictly before today ET).
+          --all              Fetch from the earliest supported trade date instead of the default
+                             one-year window (Databento bills per GB — use deliberately).
           --saveto <folder>  Output folder. Default: {{DefaultSaveTo}}
                              Supports tokens: %MYDOCS%, %DESKTOP%, %USERPROFILE%, %LOCALAPPDATA%,
                              plus any defined environment variable.
@@ -53,11 +53,16 @@ internal sealed class Settings
           --set-key <key>    Save your Databento API key (DPAPI-encrypted, per Windows user) and exit.
           --help, -h         Show this help.
 
-        The API key is read from %LOCALAPPDATA%\DatabentoDbnDownloader\api-key.dat. Set it once with:
-          DatabentoDbnDownloader --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+        The fetch always runs up to yesterday's trade date (ET). By default the start is the
+        first trade date on or after (yesterday − 1 year); pass --all to start at the earliest
+        supported trade date instead.
 
-        Example:
-          DatabentoDbnDownloader --symbols ES,NQ --from 2026-05-04 --until 2026-05-08
+        The API key is read from %LOCALAPPDATA%\StbaFetcher\api-key.dat. Set it once with:
+          StbaFetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+        Examples:
+          StbaFetcher --symbols ALL
+          StbaFetcher --symbols ES,NQ --all
         """;
 
     /// <exception cref="ArgumentException">An argument is missing, unknown, or malformed.</exception>
@@ -67,11 +72,10 @@ internal sealed class Settings
             return new Settings { ShowHelp = true };
 
         string? symbols = null;
-        string? from = null;
-        string? until = null;
         string? saveTo = null;
         string? threads = null;
         string? setKey = null;
+        var all = false;
         var overwrite = false;
         var verbose = false;
 
@@ -81,10 +85,9 @@ internal sealed class Settings
             switch (key)
             {
                 case "--symbols": symbols = NextValue(args, ref i, key); break;
-                case "--from": from = NextValue(args, ref i, key); break;
-                case "--until": until = NextValue(args, ref i, key); break;
                 case "--saveto": saveTo = NextValue(args, ref i, key); break;
                 case "--threads": threads = NextValue(args, ref i, key); break;
+                case "--all": all = true; break;
                 case "--overwrite": overwrite = true; break;
                 case "--verbose": verbose = true; break;
                 case "--set-key": setKey = NextValue(args, ref i, key); break;
@@ -104,24 +107,33 @@ internal sealed class Settings
             throw new ArgumentException("--symbols is required.");
 
         var parsedSymbols = ParseSymbols(symbols);
-        var today = EasternTime.TodayEt();
+        var until = EasternTime.TodayEt().LatestTradeDateBefore();
+        var earliest = DateOnlyExtenders.EarliestTradeDate();
 
-        var parsedFrom = string.IsNullOrWhiteSpace(from)
-            ? DateOnlyExtenders.EarliestTradeDate()
-            : ParseTradeDate(from, "--from");
-        var parsedUntil = string.IsNullOrWhiteSpace(until)
-            ? today.LatestTradeDateBefore()
-            : ParseTradeDate(until, "--until");
-        if (parsedUntil < parsedFrom)
-            throw new ArgumentException($"--until ({parsedUntil:yyyy-MM-dd}) must be on or after --from ({parsedFrom:yyyy-MM-dd}).");
+        DateOnly from;
+        if (all)
+        {
+            from = earliest;
+        }
+        else
+        {
+            // Anchor a one-year window on yesterday's trade date and snap forward to a
+            // valid trade date; clamp to the earliest supported date when the anchor
+            // predates the calendar.
+            var anchor = until.AddYears(-1);
+            from = anchor < earliest ? earliest : anchor;
+            while (from <= until && !from.IsTradeDate())
+                from = from.AddDays(1);
+        }
 
         return new Settings
         {
             Symbols = parsedSymbols,
-            From = parsedFrom,
-            Until = parsedUntil,
+            From = from,
+            Until = until,
             SaveTo = PathTokens.Expand(string.IsNullOrWhiteSpace(saveTo) ? DefaultSaveTo : saveTo),
             Threads = threads is null ? DefaultThreads : ParseThreads(threads),
+            All = all,
             Overwrite = overwrite,
             Verbose = verbose,
         };
@@ -136,11 +148,18 @@ internal sealed class Settings
         var list = new List<Symbol>(parts.Length);
         foreach (var p in parts)
         {
-            if (!Enum.TryParse<Symbol>(p, ignoreCase: true, out var sym))
+            if (string.Equals(p, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var sym in Enum.GetValues<Symbol>())
+                    if (!list.Contains(sym))
+                        list.Add(sym);
+                continue;
+            }
+            if (!Enum.TryParse<Symbol>(p, ignoreCase: true, out var parsed))
                 throw new ArgumentException(
-                    $"Unknown symbol '{p}'. Supported: {string.Join(", ", Enum.GetNames<Symbol>())}.");
-            if (!list.Contains(sym))
-                list.Add(sym);
+                    $"Unknown symbol '{p}'. Supported: {string.Join(", ", Enum.GetNames<Symbol>())}, ALL.");
+            if (!list.Contains(parsed))
+                list.Add(parsed);
         }
         return list;
     }
@@ -150,22 +169,6 @@ internal sealed class Settings
         if (i + 1 >= args.Length)
             throw new ArgumentException($"Argument '{key}' expects a value.");
         return args[++i];
-    }
-
-    private static DateOnly ParseTradeDate(string value, string argName)
-    {
-        if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var parsed))
-        {
-            throw new ArgumentException($"Could not parse {argName} value '{value}'. Use yyyy-MM-dd.");
-        }
-        if (!parsed.IsTradeDate())
-        {
-            throw new ArgumentException(
-                $"{argName} ({parsed:yyyy-MM-dd}) is not a valid trade date " +
-                "(weekend, holiday, or out of the supported calendar).");
-        }
-        return parsed;
     }
 
     private static int ParseThreads(string value)

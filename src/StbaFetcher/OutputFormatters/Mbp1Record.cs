@@ -1,4 +1,4 @@
-namespace DatabentoDbnDownloader.OutputFormatters;
+namespace StbaFetcher.OutputFormatters;
 
 internal readonly record struct Mbp1Record(
     long TsEvent,

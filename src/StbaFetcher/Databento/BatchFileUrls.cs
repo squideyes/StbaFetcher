@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 internal sealed record BatchFileUrls
 {

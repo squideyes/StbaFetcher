@@ -1,7 +1,7 @@
 using SquidEyes.Pricing;
 using SquidEyes.Pricing.Stba;
 
-namespace DatabentoDbnDownloader.OutputFormatters;
+namespace StbaFetcher.OutputFormatters;
 
 /// <summary>
 /// Adapts <see cref="StbaCsvEncoder"/> to <see cref="IMbp1Emitter"/>: buffers MBP-1 records

@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Text;
-using DatabentoDbnDownloader.OutputFormatters;
+using StbaFetcher.OutputFormatters;
 using Microsoft.Extensions.Logging;
 using ZstdSharp;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 internal sealed class DbnMbp1Converter(ILogger<DbnMbp1Converter> logger)
 {

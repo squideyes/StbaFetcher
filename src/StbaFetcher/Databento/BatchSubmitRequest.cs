@@ -1,4 +1,4 @@
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 internal sealed record BatchSubmitRequest(
     string Dataset,

@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 internal sealed class DatabentoBatchApi(HttpClient client, ILogger<DatabentoBatchApi> logger)
 {

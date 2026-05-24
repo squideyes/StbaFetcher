@@ -1,7 +1,5 @@
-using DatabentoDbnDownloader;
+using StbaFetcher;
 using Microsoft.Extensions.Logging;
-
-// Exit codes: 0 = success, 1 = error, 2 = bad arguments, 130 = cancelled.
 
 using var cancellation = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -18,22 +16,22 @@ try
     if (settings.ShowHelp)
     {
         Console.WriteLine(Settings.HelpText);
-        return 0;
+        return ExitCode.Success;
     }
 
     if (settings.SetApiKey is not null)
     {
         SecretStore.WriteApiKey(settings.SetApiKey);
         Console.WriteLine($"Saved {SecretStore.ApiKeyName} to {SecretStore.SecretsFilePath}");
-        return 0;
+        return ExitCode.Success;
     }
 
     var apiKey = SecretStore.ReadApiKey();
     if (apiKey is null)
     {
         Console.Error.WriteLine("Databento API key is not set. Run:");
-        Console.Error.WriteLine("  DatabentoDbnDownloader --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-        return 1;
+        Console.Error.WriteLine("  StbaFetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+        return ExitCode.Error;
     }
 
     AppLogging.Init(settings.Verbose ? LogLevel.Debug : LogLevel.Information);
@@ -48,15 +46,15 @@ try
 catch (ArgumentException ex)
 {
     Console.Error.WriteLine($"Argument error: {ex.Message}");
-    return 2;
+    return ExitCode.BadArguments;
 }
 catch (OperationCanceledException)
 {
     Console.Error.WriteLine("Cancelled.");
-    return 130;
+    return ExitCode.Cancelled;
 }
 catch (Exception ex)
 {
     Console.Error.WriteLine($"Error: {ex.Message}");
-    return 1;
+    return ExitCode.Error;
 }

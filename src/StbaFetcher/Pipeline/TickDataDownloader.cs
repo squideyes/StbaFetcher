@@ -1,11 +1,11 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
-using DatabentoDbnDownloader.OutputFormatters;
+using StbaFetcher.OutputFormatters;
 using Microsoft.Extensions.Logging;
 using SquidEyes.Pricing;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 /// <summary>
 /// Top-level pipeline: enumerate trade dates, submit one batch job per date for the symbols
@@ -39,7 +39,7 @@ internal sealed class TickDataDownloader
         {
             _logger.LogWarning("No trade dates in [{From:yyyy-MM-dd}..{Until:yyyy-MM-dd}].",
                 _settings.From, _settings.Until);
-            return 0;
+            return ExitCode.Success;
         }
 
         _logger.LogInformation(
@@ -51,7 +51,7 @@ internal sealed class TickDataDownloader
         if (work.Count == 0)
         {
             _logger.LogInformation("All outputs already exist; nothing to do (use --overwrite to force).");
-            return 0;
+            return ExitCode.Success;
         }
 
         _logger.LogInformation("Submitting {Jobs} batch job(s) (one per trade date that has missing symbols).",

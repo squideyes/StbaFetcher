@@ -1,4 +1,4 @@
-namespace DatabentoDbnDownloader.OutputFormatters;
+namespace StbaFetcher.OutputFormatters;
 
 internal interface IMbp1Emitter : IAsyncDisposable
 {

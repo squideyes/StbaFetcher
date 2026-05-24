@@ -1,4 +1,4 @@
-# DatabentoDbnDownloader
+# StbaFetcher
 
 A small .NET 10 / C# 14 CLI that downloads CME futures **MBP-1** data from Databento and
 converts it into **STBA** (Squideyes Trade/Bid/Ask, binary) and **STBA.CSV** (the same logical
@@ -25,9 +25,11 @@ For every `(symbol, trade-date)` in the requested range the tool produces **four
 …organised as `{SaveTo}/{Symbol}/{Year}/<filename>` — e.g.
 `%MYDOCS%\DataBento\ES\2026\ES_20260514_M6_DB_MTH_ET.stba`.
 
-Default behaviour is to **fetch every missing trade date up to yesterday** for each requested
-symbol. A `(symbol, date)` whose four outputs already exist is skipped without issuing a
-(billed) batch request. Pass `--overwrite` to force a refetch.
+Default behaviour is to **fetch every missing trade date in the last year up to yesterday**
+for each requested symbol — Databento bills per GB, so the one-year window keeps casual
+backfills cheap. Pass `--all` to widen the window to the earliest supported trade date.
+A `(symbol, date)` whose four outputs already exist is skipped without issuing a (billed)
+batch request. Pass `--overwrite` to force a refetch.
 
 Internally each batch request covers the wider DTH window; a single DBN parse feeds both
 session accumulators. The `.dbn.zst` source file is deleted after a successful conversion.
@@ -42,17 +44,20 @@ session accumulators. The `.dbn.zst` source file is deleted after a successful c
 
 ```powershell
 # one-time setup, per Windows user / machine (DPAPI-encrypts the key)
-dotnet run --project src\DatabentoDbnDownloader -- --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+dotnet run --project src\StbaFetcher -- --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# fetch every missing trade date for ES and NQ, up to yesterday
-dotnet run --project src\DatabentoDbnDownloader -- --symbols ES,NQ
+# fetch the last year of missing trade dates for ES and NQ, up to yesterday
+dotnet run --project src\StbaFetcher -- --symbols ES,NQ
 
-# or a specific range
-dotnet run --project src\DatabentoDbnDownloader -- --symbols ES --from 2026-05-04 --until 2026-05-08
+# fetch every supported symbol (ALL expands the enum; dedupes against any extras)
+dotnet run --project src\StbaFetcher -- --symbols ALL
+
+# go all the way back to the earliest supported trade date (bills per GB)
+dotnet run --project src\StbaFetcher -- --symbols ES --all
 ```
 
 `--set-key` encrypts the value with [Windows DPAPI](https://learn.microsoft.com/dotnet/standard/security/how-to-use-data-protection)
-and writes the ciphertext to `%LOCALAPPDATA%\DatabentoDbnDownloader\api-key.dat`. The file is
+and writes the ciphertext to `%LOCALAPPDATA%\StbaFetcher\api-key.dat`. The file is
 bound to **both** the current Windows account **and** this machine — copying it elsewhere will
 not decrypt.
 
@@ -60,9 +65,8 @@ not decrypt.
 
 | Option        | Description                                                                  | Default              |
 |---------------|------------------------------------------------------------------------------|----------------------|
-| `--symbols`   | Comma-separated root symbols (continuous front month is implied).            | *(required)*         |
-| `--from`      | Inclusive ET trade-date (`yyyy-MM-dd`). Must be a valid trade date.          | earliest trade date  |
-| `--until`     | Inclusive ET trade-date (`yyyy-MM-dd`). Must be a valid trade date.          | yesterday (ET)       |
+| `--symbols`   | Comma-separated root symbols, or `ALL`. Continuous front month is implied.   | *(required)*         |
+| `--all`       | Fetch from the earliest supported trade date instead of the 1-year default.  | *(off)*              |
 | `--saveto`    | Output folder. Supports path tokens (see below).                             | `%MYDOCS%\DataBento` |
 | `--threads`   | Concurrent file downloads per batch job.                                     | `4`                  |
 | `--overwrite` | Refetch `(symbol, date)` tuples whose outputs already exist.                 | *(off)*              |
@@ -71,7 +75,13 @@ not decrypt.
 | `--help`/`-h` | Show usage.                                                                  |                      |
 
 **Supported symbols** come from `SquidEyes.Pricing.Symbol`: `ES`, `NQ`, `CL`, `GC`, `TY`,
-`FV`, `US`, `JY`, `EU`, `BP`. Anything else fails fast at argument parsing.
+`FV`, `US`, `JY`, `EU`, `BP`. The literal `ALL` expands to every symbol in that enum;
+mixed lists like `ALL,NQ` are deduped. Anything else fails fast at argument parsing.
+
+**Date range.** The fetch always ends at yesterday's ET trade date. By default the start
+is the first valid trade date on or after `(yesterday − 1 year)`; with `--all` it falls
+back to the earliest supported trade date (`SquidEyes.Pricing.Session.MinDate`, snapped
+forward to a trade date).
 
 ### `--saveto` path tokens
 
@@ -103,7 +113,7 @@ sorted, with sequential same-`(ms, kind, price)` rows merged into a summed-volum
 ## Project layout
 
 ```text
-src/DatabentoDbnDownloader/
+src/StbaFetcher/
   Program.cs                          # ~60 lines: arg parse, secret load, dispatch
   Settings.cs                         # CLI parser
   Common/

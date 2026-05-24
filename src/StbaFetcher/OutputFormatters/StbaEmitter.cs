@@ -1,7 +1,7 @@
 using SquidEyes.Pricing;
 using SquidEyes.Pricing.Stba;
 
-namespace DatabentoDbnDownloader.OutputFormatters;
+namespace StbaFetcher.OutputFormatters;
 
 internal sealed class StbaEmitter : IMbp1Emitter
 {

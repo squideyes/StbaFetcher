@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 internal static class JsonOptions
 {

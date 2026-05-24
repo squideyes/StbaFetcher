@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 internal static partial class PathTokens
 {

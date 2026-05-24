@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 internal static class DatabentoHttpClient
 {
@@ -20,7 +20,7 @@ internal static class DatabentoHttpClient
 
         var raw = Encoding.ASCII.GetBytes($"{apiKey}:");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(raw));
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("DatabentoDbnDownloader/1.0");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("StbaFetcher/1.0");
         return client;
     }
 }

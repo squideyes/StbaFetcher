@@ -1,7 +1,7 @@
 using System.Globalization;
 using SquidEyes.Pricing;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 /// <summary>
 /// Resolves the on-disk layout for converted output files. All artifacts for a

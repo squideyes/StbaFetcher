@@ -1,6 +1,6 @@
 using SquidEyes.Pricing;
 
-namespace DatabentoDbnDownloader.OutputFormatters;
+namespace StbaFetcher.OutputFormatters;
 
 /// <summary>
 /// Buffers MBP-1 records, filters to the configured ET window, dedupes BBO updates, then on Build

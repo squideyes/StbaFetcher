@@ -1,22 +1,22 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DatabentoDbnDownloader;
+namespace StbaFetcher;
 
 /// <summary>
 /// Reads and writes the Databento API key using <see cref="ProtectedData"/> (DPAPI). The
-/// ciphertext lives at <c>%LOCALAPPDATA%\DatabentoDbnDownloader\api-key.dat</c> and is bound
+/// ciphertext lives at <c>%LOCALAPPDATA%\StbaFetcher\api-key.dat</c> and is bound
 /// to both the current Windows user and the machine.
 /// </summary>
 internal static class SecretStore
 {
     public const string ApiKeyName = "DATABENTO_API_KEY";
 
-    private static readonly byte[] _entropy = "DatabentoDbnDownloader:DATABENTO_API_KEY:v1"u8.ToArray();
+    private static readonly byte[] _entropy = "StbaFetcher:DATABENTO_API_KEY:v1"u8.ToArray();
 
     public static string SecretsFilePath { get; internal set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DatabentoDbnDownloader",
+        "StbaFetcher",
         "api-key.dat");
 
     public static string? ReadApiKey()
