@@ -22,7 +22,7 @@ try
     if (settings.SetApiKey is not null)
     {
         SecretStore.WriteApiKey(settings.SetApiKey);
-        Console.WriteLine($"Saved {SecretStore.ApiKeyName} to {SecretStore.SecretsFilePath}");
+        Console.WriteLine($"Saved {SecretStore.ApiKeyName} to Windows Credential Manager ({SecretStore.TargetName}).");
         return ExitCode.Success;
     }
 

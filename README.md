@@ -27,7 +27,7 @@ For every `(symbol, trade-date)` in the requested range the tool produces **four
 
 Default behaviour is to **fetch every missing trade date in the last year up to yesterday**
 for each requested symbol — Databento bills per GB, so the one-year window keeps casual
-backfills cheap. Pass `--all` to widen the window to the earliest supported trade date.
+backfills cheap. Pass `--alldates` to widen the window to the earliest supported trade date.
 A `(symbol, date)` whose four outputs already exist is skipped without issuing a (billed)
 batch request. Pass `--overwrite` to force a refetch.
 
@@ -56,17 +56,17 @@ dotnet run --project src\StbaFetcher -- --symbols ALL
 dotnet run --project src\StbaFetcher -- --symbols ES --all
 ```
 
-`--set-key` encrypts the value with [Windows DPAPI](https://learn.microsoft.com/dotnet/standard/security/how-to-use-data-protection)
-and writes the ciphertext to `%LOCALAPPDATA%\StbaFetcher\api-key.dat`. The file is
-bound to **both** the current Windows account **and** this machine — copying it elsewhere will
-not decrypt.
+`--set-key` stores the value in **Windows Credential Manager** as the Generic credential
+`StbaFetcher:DATABENTO_API_KEY`. Credential Manager DPAPI-encrypts the blob under the
+current Windows user, so it never lands on disk in this app's own folders. You can see /
+remove it via *Control Panel → Credential Manager → Windows Credentials*.
 
 ## CLI options
 
 | Option        | Description                                                                  | Default              |
 |---------------|------------------------------------------------------------------------------|----------------------|
 | `--symbols`   | Comma-separated root symbols, or `ALL`. Continuous front month is implied.   | *(required)*         |
-| `--all`       | Fetch from the earliest supported trade date instead of the 1-year default.  | *(off)*              |
+| `--alldates`  | Fetch from the earliest supported trade date instead of the 1-year default.  | *(off)*              |
 | `--saveto`    | Output folder. Supports path tokens (see below).                             | `%MYDOCS%\DataBento` |
 | `--threads`   | Concurrent file downloads per batch job.                                     | `4`                  |
 | `--overwrite` | Refetch `(symbol, date)` tuples whose outputs already exist.                 | *(off)*              |
@@ -79,7 +79,7 @@ not decrypt.
 mixed lists like `ALL,NQ` are deduped. Anything else fails fast at argument parsing.
 
 **Date range.** The fetch always ends at yesterday's ET trade date. By default the start
-is the first valid trade date on or after `(yesterday − 1 year)`; with `--all` it falls
+is the first valid trade date on or after `(yesterday − 1 year)`; with `--alldates` it falls
 back to the earliest supported trade date (`SquidEyes.Pricing.Session.MinDate`, snapped
 forward to a trade date).
 

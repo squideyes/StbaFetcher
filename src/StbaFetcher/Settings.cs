@@ -42,7 +42,7 @@ internal sealed class Settings
                              'ALL,NQ' are deduped. Continuous front month (.c.0) is implied.
 
         Options:
-          --all              Fetch from the earliest supported trade date instead of the default
+          --alldates              Fetch from the earliest supported trade date instead of the default
                              one-year window (Databento bills per GB — use deliberately).
           --saveto <folder>  Output folder. Default: {{DefaultSaveTo}}
                              Supports tokens: %MYDOCS%, %DESKTOP%, %USERPROFILE%, %LOCALAPPDATA%,
@@ -54,15 +54,16 @@ internal sealed class Settings
           --help, -h         Show this help.
 
         The fetch always runs up to yesterday's trade date (ET). By default the start is the
-        first trade date on or after (yesterday − 1 year); pass --all to start at the earliest
+        first trade date on or after (yesterday − 1 year); pass --alldates to start at the earliest
         supported trade date instead.
 
-        The API key is read from %LOCALAPPDATA%\StbaFetcher\api-key.dat. Set it once with:
+        The API key is stored in Windows Credential Manager (Generic credential
+        '{{SecretStore.TargetName}}', DPAPI-protected, per Windows user). Set it once with:
           StbaFetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
         Examples:
           StbaFetcher --symbols ALL
-          StbaFetcher --symbols ES,NQ --all
+          StbaFetcher --symbols ES,NQ --alldates
         """;
 
     /// <exception cref="ArgumentException">An argument is missing, unknown, or malformed.</exception>
@@ -87,7 +88,7 @@ internal sealed class Settings
                 case "--symbols": symbols = NextValue(args, ref i, key); break;
                 case "--saveto": saveTo = NextValue(args, ref i, key); break;
                 case "--threads": threads = NextValue(args, ref i, key); break;
-                case "--all": all = true; break;
+                case "--alldates": all = true; break;
                 case "--overwrite": overwrite = true; break;
                 case "--verbose": verbose = true; break;
                 case "--set-key": setKey = NextValue(args, ref i, key); break;
