@@ -2,6 +2,8 @@ using System.Buffers.Binary;
 using System.Text;
 using ZstdSharp;
 
+namespace DatabentoDbnDownloader;
+
 /// <summary>
 /// Reads the DBN file header + metadata section. The metadata's symbol mappings let us
 /// resolve a requested symbol (e.g. "ES.c.0" continuous) to the actual contract symbol
@@ -66,38 +68,6 @@ internal sealed class DbnMetadataReader
         try
         {
             return Read(stream);
-        }
-        finally
-        {
-            if (!ReferenceEquals(stream, fs)) stream.Dispose();
-        }
-    }
-
-    public static void DumpRawHeader(string path, int bytes)
-    {
-        using var fs = File.OpenRead(path);
-        Stream stream = path.EndsWith(".zst", StringComparison.OrdinalIgnoreCase)
-            ? new DecompressionStream(fs)
-            : fs;
-        try
-        {
-            Span<byte> head = stackalloc byte[8];
-            stream.ReadExactly(head);
-            var ver = head[3];
-            var metaLen = BinaryPrimitives.ReadUInt32LittleEndian(head[4..]);
-            Console.WriteLine($"[raw] DBN v{ver}, metadata_length={metaLen}");
-
-            var buf = new byte[Math.Min(bytes, (int)metaLen)];
-            stream.ReadExactly(buf);
-
-            for (int i = 0; i < buf.Length; i += 16)
-            {
-                var len = Math.Min(16, buf.Length - i);
-                var hex = string.Join(' ', Enumerable.Range(0, len).Select(k => buf[i + k].ToString("X2")));
-                var ascii = new string(Enumerable.Range(0, len).Select(k => buf[i + k] is >= 0x20 and < 0x7F ? (char)buf[i + k] : '.').ToArray());
-                Console.WriteLine($"  {i,4:X4}: {hex,-47}  {ascii}");
-            }
-            Console.WriteLine();
         }
         finally
         {

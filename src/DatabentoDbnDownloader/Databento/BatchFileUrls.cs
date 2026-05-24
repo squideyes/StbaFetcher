@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 
+namespace DatabentoDbnDownloader;
+
 internal sealed record BatchFileUrls
 {
     [JsonPropertyName("https")] public string? Https { get; init; }

@@ -1,4 +1,3 @@
 <Solution>
   <Project Path="src/DatabentoDbnDownloader/DatabentoDbnDownloader.csproj" />
-  <Project Path="tests/DatabentoDbnDownloader.UnitTests/DatabentoDbnDownloader.UnitTests.csproj" />
 </Solution>

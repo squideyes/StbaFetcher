@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
+namespace DatabentoDbnDownloader;
+
 internal sealed class DatabentoBatchApi(HttpClient client, ILogger<DatabentoBatchApi> logger)
 {
     public async Task<BatchJob> SubmitJobAsync(BatchSubmitRequest request)
@@ -161,7 +163,7 @@ internal sealed class DatabentoBatchApi(HttpClient client, ILogger<DatabentoBatc
         logger.LogDebug("{Operation} -> HTTP {Status} in {Elapsed:F0}ms ({Bytes} bytes)",
             operation, (int)response.StatusCode, sw.Elapsed.TotalMilliseconds, body.Length);
 
-        return JsonSerializer.Deserialize<T>(body, JsonOptions.Indented)
+        return JsonSerializer.Deserialize<T>(body, JsonOptions.Web)
             ?? throw new InvalidOperationException($"Could not deserialize Databento response: {body}");
     }
 

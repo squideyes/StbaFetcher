@@ -1,5 +1,4 @@
-using DatabentoDbnDownloader.TickSets;
-using static DatabentoDbnDownloader.OutputFormatters.FormatHelpers;
+using SquidEyes.Pricing;
 
 namespace DatabentoDbnDownloader.OutputFormatters;
 
@@ -9,7 +8,7 @@ namespace DatabentoDbnDownloader.OutputFormatters;
 /// </summary>
 internal sealed class Mbp1TickAccumulator
 {
-    private readonly Asset _asset;
+    private readonly Instrument _instrument;
     private readonly DateOnly _date;
     private readonly Contract _contract;
     private readonly long _fromMs;
@@ -19,9 +18,9 @@ internal sealed class Mbp1TickAccumulator
     private (int Px, int Sz)? _lastBid;
     private (int Px, int Sz)? _lastAsk;
 
-    public Mbp1TickAccumulator(Symbol symbol, Contract contract, DateOnly date, TimeRange range)
+    public Mbp1TickAccumulator(Symbol symbol, Contract contract, DateOnly date, SessionKind range)
     {
-        _asset = Asset.Create(symbol);
+        _instrument = Instrument.Create(symbol);
         _date = date;
         _contract = contract;
         var (from, until) = range.ToTimes();
@@ -31,7 +30,7 @@ internal sealed class Mbp1TickAccumulator
 
     public void Add(in Mbp1Record r)
     {
-        var et = ToEt(r.TsEvent);
+        var et = EasternTime.FromUtc(FromUnixNanos(r.TsEvent));
         if (DateOnly.FromDateTime(et) != _date) return;
 
         var msInDay = (long)et.TimeOfDay.TotalMilliseconds;
@@ -41,7 +40,18 @@ internal sealed class Mbp1TickAccumulator
         {
             var p = ToTicks(r.Price);
             if (p == int.MinValue) return;
-            _buffer.Add(((int)msInDay, PriceKind.Trade, p, (int)r.Size));
+
+            // r.Side on a trade record = which side of the book was matched.
+            //   'B' = trade printed at bid → seller hit the resting bid     → TradeBid
+            //   'A' = trade printed at ask → buyer lifted the resting ask   → TradeAsk
+            //   'N' = unknown aggressor — pick TradeAsk arbitrarily so the data isn't dropped
+            var kind = r.Side switch
+            {
+                'B' => PriceKind.TradeBid,
+                'A' => PriceKind.TradeAsk,
+                _   => PriceKind.TradeAsk
+            };
+            _buffer.Add(((int)msInDay, kind, p, (int)r.Size));
             return;
         }
 
@@ -84,7 +94,7 @@ internal sealed class Mbp1TickAccumulator
             return a.PriceTicks.CompareTo(b.PriceTicks);
         });
 
-        var builder = TickSet.CreateBuilder(_asset, _date, _contract);
+        var builder = TickSet.CreateBuilder(_instrument, _date, _contract);
         foreach (var (timeMs, kind, priceTicks, size) in _buffer)
             builder.Add(timeMs, kind, priceTicks, size);
 
@@ -95,6 +105,14 @@ internal sealed class Mbp1TickAccumulator
     {
         if (fixedPx == long.MaxValue || fixedPx == long.MinValue) return int.MinValue;
         var d = (decimal)fixedPx / 1_000_000_000m;
-        return (int)Math.Round(d / _asset.TickSize);
+        return (int)Math.Round(d / _instrument.TickSize);
+    }
+
+    private static DateTimeOffset FromUnixNanos(long ns)
+    {
+        var seconds = ns / 1_000_000_000L;
+        var subNs = ns - seconds * 1_000_000_000L;
+        if (subNs < 0) { seconds--; subNs += 1_000_000_000L; }
+        return DateTimeOffset.FromUnixTimeSeconds(seconds).AddTicks(subNs / 100);
     }
 }

@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 
+namespace DatabentoDbnDownloader;
+
 internal sealed record BatchJob
 {
     [JsonPropertyName("id")] public required string Id { get; init; }

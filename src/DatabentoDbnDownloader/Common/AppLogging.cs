@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
 
+namespace DatabentoDbnDownloader;
+
 internal static class AppLogging
 {
     public static ILoggerFactory Factory { get; private set; } = NullLoggerFactory.Instance;
@@ -23,4 +25,5 @@ internal static class AppLogging
     }
 
     public static ILogger<T> CreateLogger<T>() => Factory.CreateLogger<T>();
+    public static ILogger CreateLogger(string category) => Factory.CreateLogger(category);
 }

@@ -4,6 +4,8 @@ using DatabentoDbnDownloader.OutputFormatters;
 using Microsoft.Extensions.Logging;
 using ZstdSharp;
 
+namespace DatabentoDbnDownloader;
+
 internal sealed class DbnMbp1Converter(ILogger<DbnMbp1Converter> logger)
 {
     private const byte Mbp1Rtype = 1;
