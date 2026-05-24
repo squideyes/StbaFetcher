@@ -36,24 +36,43 @@ session accumulators. The `.dbn.zst` source file is deleted after a successful c
 
 ## Requirements
 
-- .NET 10 SDK
-- Windows (the API-key store uses DPAPI)
-- A Databento API key with access to `GLBX.MDP3`
+- **.NET 10 runtime** (for using the tool) — get it from <https://dotnet.microsoft.com/download>.
+  The full SDK is only needed if you plan to build from source.
+- Windows (the API-key store uses Windows Credential Manager + DPAPI).
+- A Databento API key with access to `GLBX.MDP3`.
 
-## Quick start
+## Install
 
-```powershell
-# one-time setup, per Windows user / machine (DPAPI-encrypts the key)
-dotnet run --project src\StbaFetcher -- --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+StbaFetcher ships as a [.NET global tool](https://learn.microsoft.com/dotnet/core/tools/global-tools)
+on nuget.org, so installation is a single command from any shell:
+
+```pwsh
+dotnet tool install -g SquidEyes.StbaFetcher
+```
+
+This puts a `stbafetcher` command on PATH (under `%USERPROFILE%\.dotnet\tools\` on
+Windows). Upgrade or uninstall later with:
+
+```pwsh
+dotnet tool update    -g SquidEyes.StbaFetcher
+dotnet tool list      -g
+dotnet tool uninstall -g SquidEyes.StbaFetcher
+```
+
+## Quickstart
+
+```pwsh
+# one-time setup, per Windows user (stored in Windows Credential Manager)
+stbafetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # fetch the last year of missing trade dates for ES and NQ, up to yesterday
-dotnet run --project src\StbaFetcher -- --symbols ES,NQ
+stbafetcher --symbols ES,NQ
 
 # fetch every supported symbol (ALL expands the enum; dedupes against any extras)
-dotnet run --project src\StbaFetcher -- --symbols ALL
+stbafetcher --symbols ALL
 
 # go all the way back to the earliest supported trade date (bills per GB)
-dotnet run --project src\StbaFetcher -- --symbols ES --all
+stbafetcher --symbols ES --alldates
 ```
 
 `--set-key` stores the value in **Windows Credential Manager** as the Generic credential
@@ -112,28 +131,55 @@ sorted, with sequential same-`(ms, kind, price)` rows merged into a summed-volum
 
 ## Project layout
 
+This is a **single-project solution**: `StbaFetcher.csproj` lives at the repo root and is
+both the library and the executable. Pricing primitives (`EasternTime`, the trade-date
+calendar, the STBA encoder, etc.) come from the local `..\SquidEyes.Pricing\` project
+reference until the next NuGet release ships them.
+
 ```text
-src/StbaFetcher/
-  Program.cs                          # ~60 lines: arg parse, secret load, dispatch
-  Settings.cs                         # CLI parser
-  Common/
-    AppLogging.cs
-    EasternTime.cs                    # DST-correct ET ↔ UTC helpers
-    PathTokens.cs                     # %MYDOCS% expansion
-    SecretStore.cs                    # DPAPI-encrypted API key
-  Databento/
-    BatchFile.cs, BatchFileUrls.cs, BatchJob.cs, BatchSubmitRequest.cs
-    DatabentoBatchApi.cs              # batch.submit_job / list_jobs / list_files / symbology.resolve
-    DatabentoHttpClient.cs            # HTTP client with Basic auth
-    DbnMbp1Converter.cs               # streams MBP-1 records to N emitters
-    DbnMetadataReader.cs              # DBN v1/v2/v3 metadata parser
-    JsonOptions.cs
-  Pipeline/
-    OutputPaths.cs                    # {SaveTo}/{Symbol}/{Year}/ + canonical filename
-    TickDataDownloader.cs             # main orchestrator
-  OutputFormatters/
-    IMbp1Emitter.cs, Mbp1Record.cs, Mbp1TickAccumulator.cs
-    StbaEmitter.cs, StbaCsvEmitter.cs
+Program.cs                            # ~60 lines: arg parse, secret load, dispatch
+Settings.cs                           # CLI parser
+Common/
+  AppLogging.cs
+  ExitCode.cs
+  PathTokens.cs                       # %MYDOCS% expansion
+  SecretStore.cs                      # Windows Credential Manager (DPAPI-backed)
+Databento/
+  BatchFile.cs, BatchFileUrls.cs, BatchJob.cs, BatchSubmitRequest.cs
+  DatabentoBatchApi.cs                # batch.submit_job / list_jobs / list_files / symbology.resolve
+  DatabentoHttpClient.cs              # HTTP client with Basic auth
+  DbnMbp1Converter.cs                 # streams MBP-1 records to N emitters
+  DbnMetadataReader.cs                # DBN v1/v2/v3 metadata parser
+  JsonOptions.cs
+Pipeline/
+  OutputPaths.cs                      # {SaveTo}/{Symbol}/{Year}/ + canonical filename
+  TickDataDownloader.cs               # main orchestrator
+OutputFormatters/
+  IMbp1Emitter.cs, Mbp1Record.cs, Mbp1TickAccumulator.cs
+  StbaEmitter.cs, StbaCsvEmitter.cs
+```
+
+## Building from source
+
+You only need this section if you're contributing or want to run an unreleased version.
+End users should use the `dotnet tool install` flow above.
+
+```pwsh
+# requires the .NET 10 SDK (not just the runtime)
+dotnet build
+
+# API key for source runs — the built exe accepts --set-key just like the global tool
+# and writes to the same Credential Manager entry. One-time setup per Windows user:
+dotnet run -- --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# run directly from the solution root:
+dotnet run -- --symbols ES,NQ
+
+# produce the global-tool package locally (output: bin/Release/*.nupkg):
+dotnet pack -c Release
+
+# install your local build into the global tool store for end-to-end testing:
+dotnet tool install -g --add-source ./bin/Release SquidEyes.StbaFetcher
 ```
 
 ## Notes on the Databento API
@@ -156,4 +202,4 @@ pay $0.
 
 ## License
 
-(Add your chosen license here before publishing.)
+MIT — see [`LICENSE`](./LICENSE).
