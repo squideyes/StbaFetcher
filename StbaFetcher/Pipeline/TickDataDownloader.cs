@@ -127,15 +127,14 @@ internal sealed class TickDataDownloader
 
         _logger.LogInformation("[{N}/{Total}] FETCH {Date:yyyy-MM-dd} {Symbol}", index, total, date, symbol);
 
-        // Continuous front month by open interest (.n.0) rather than by calendar
-        // expiry (.c.0). For GC in particular this matters: gold lists all 12 months
-        // (F-Z) but OI is concentrated in the cycle months (G/J/M/Q/V/Z), so .c.0
-        // periodically lands on off-cycle expiries like GCK5 that downstream tooling
-        // doesn't recognise. .n.0 always lands on the contract most traders care about.
-        // For quarterly symbols (ES/NQ) and high-volume monthlies (CL) the two agree
-        // outside narrow roll windows.
+        // Continuous front month by VOLUME (.v.0) — the contract traders actually
+        // worked yesterday. Volume crosses to the new contract 1-3 days before OI
+        // does, so .v.0 returns the new front on settlement day (when .n.0 would
+        // still report the dying contract because yesterday's EOD OI was still in
+        // it). .c.0 (calendar-nearest) is unusable for GC because gold lists every
+        // month but only G/J/M/Q/V/Z carry real liquidity.
         await _api.StreamGetRangeAsync(
-            dataset: Dataset, symbol: symbol + ".n.0", schema: Schema,
+            dataset: Dataset, symbol: symbol + ".v.0", schema: Schema,
             startUtc: startUtc, endUtc: endUtc,
             stypeIn: STypeIn, stypeOut: STypeOut,
             destPath: dbnPath, cancellationToken: cancellationToken).ConfigureAwait(false);
