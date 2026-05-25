@@ -79,23 +79,14 @@ internal sealed class DbnMbp1Converter(ILogger<DbnMbp1Converter> logger)
 
                 var record = new Mbp1Record(
                     TsEvent: BitConverter.ToInt64(buf, 8),
-                    TsRecv: BitConverter.ToInt64(buf, 32),
-                    PublisherId: BitConverter.ToUInt16(buf, 2),
-                    InstrumentId: BitConverter.ToUInt32(buf, 4),
                     Price: BitConverter.ToInt64(buf, 16),
                     Size: BitConverter.ToUInt32(buf, 24),
                     Action: (char)buf[28],
                     Side: (char)buf[29],
-                    Flags: buf[30],
-                    Depth: buf[31],
-                    TsInDelta: BitConverter.ToInt32(buf, 40),
-                    Sequence: BitConverter.ToUInt32(buf, 44),
                     BidPx: BitConverter.ToInt64(buf, 48),
                     AskPx: BitConverter.ToInt64(buf, 56),
                     BidSz: BitConverter.ToUInt32(buf, 64),
-                    AskSz: BitConverter.ToUInt32(buf, 68),
-                    BidCt: BitConverter.ToUInt32(buf, 72),
-                    AskCt: BitConverter.ToUInt32(buf, 76));
+                    AskSz: BitConverter.ToUInt32(buf, 68));
 
                 foreach (var em in emitters)
                     em.Emit(in record);

@@ -38,7 +38,7 @@ try
     var logger = AppLogging.CreateLogger("app");
 
     using var httpClient = DatabentoHttpClient.Create(apiKey);
-    var api = new DatabentoBatchApi(httpClient, AppLogging.CreateLogger<DatabentoBatchApi>());
+    var api = new DatabentoApi(httpClient, AppLogging.CreateLogger<DatabentoApi>());
 
     var pipeline = new TickDataDownloader(api, settings, logger);
     return await pipeline.RunAsync(cancellation.Token);

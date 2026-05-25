@@ -17,13 +17,9 @@ internal static class OutputPaths
         Path.Combine(Directory(saveTo, symbol, date),
             PricingFile.BuildStem(symbol, date, contract, Source.DataBento, session) + ".stba");
 
-    public static string StbaCsvPath(string saveTo, Symbol symbol, DateOnly date, Contract contract, SessionKind session) =>
-        Path.Combine(Directory(saveTo, symbol, date),
-            PricingFile.BuildStem(symbol, date, contract, Source.DataBento, session) + ".stba.csv");
-
     /// <summary>
-    /// True iff all four output files for <paramref name="symbol"/> on <paramref name="date"/>
-    /// already exist (MTH + DTH × .stba + .stba.csv), under any contract suffix. Used to skip
+    /// True iff both MTH and DTH .stba files for <paramref name="symbol"/> on
+    /// <paramref name="date"/> already exist (under any contract suffix). Used to skip
     /// already-fetched <c>(symbol, date)</c> pairs without issuing a billed batch request.
     /// </summary>
     public static bool AllOutputsExist(string saveTo, Symbol symbol, DateOnly date)
@@ -33,16 +29,13 @@ internal static class OutputPaths
 
         var datePart = date.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
         var sourcePart = Source.DataBento.ToCode();
-        return SessionsCovered(dir, symbol, datePart, sourcePart, SessionKind.MTH)
-            && SessionsCovered(dir, symbol, datePart, sourcePart, SessionKind.DTH);
+        return SessionCovered(dir, symbol, datePart, sourcePart, SessionKind.MTH)
+            && SessionCovered(dir, symbol, datePart, sourcePart, SessionKind.DTH);
     }
 
-    private static bool SessionsCovered(string dir, Symbol symbol, string datePart, string sourcePart, SessionKind session)
+    private static bool SessionCovered(string dir, Symbol symbol, string datePart, string sourcePart, SessionKind session)
     {
-        var sessionPart = session.ToCode();
-        var stbaGlob = $"{symbol}_{datePart}_*_{sourcePart}_{sessionPart}_ET.stba";
-        var stbaCsvGlob = $"{symbol}_{datePart}_*_{sourcePart}_{sessionPart}_ET.stba.csv";
-        return System.IO.Directory.EnumerateFiles(dir, stbaGlob).Any()
-            && System.IO.Directory.EnumerateFiles(dir, stbaCsvGlob).Any();
+        var glob = $"{symbol}_{datePart}_*_{sourcePart}_{session.ToCode()}_ET.stba";
+        return System.IO.Directory.EnumerateFiles(dir, glob).Any();
     }
 }

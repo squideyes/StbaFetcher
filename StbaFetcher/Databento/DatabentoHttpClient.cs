@@ -15,7 +15,9 @@ internal static class DatabentoHttpClient
         })
         {
             BaseAddress = new Uri("https://hist.databento.com/v0/"),
-            Timeout = TimeSpan.FromMinutes(10),
+            // Streaming MBP-1 responses can be hundreds of MB and take several minutes;
+            // per-request cancellation is enforced via the caller's CancellationToken.
+            Timeout = Timeout.InfiniteTimeSpan,
         };
 
         var raw = Encoding.ASCII.GetBytes($"{apiKey}:");
