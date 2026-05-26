@@ -104,8 +104,11 @@ internal sealed class Mbp1TickAccumulator
     private int ToTicks(long fixedPx)
     {
         if (fixedPx == long.MaxValue || fixedPx == long.MinValue) return int.MinValue;
-        var d = (decimal)fixedPx / 1_000_000_000m;
-        return (int)Math.Round(d / _instrument.TickSize);
+        // Databento MBP-1 prices are 1e-9 fixed-point; divide to get the decimal
+        // price, then divide by TickSize (now double in SquidEyes.Pricing 2.x) to
+        // recover the integer tick index.
+        var price = fixedPx / 1_000_000_000.0;
+        return (int)Math.Round(price / _instrument.TickSize);
     }
 
     private static DateTimeOffset FromUnixNanos(long ns)
