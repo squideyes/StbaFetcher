@@ -1,4 +1,4 @@
-using StbaFetcher;
+using StbadFetcher;
 using Microsoft.Extensions.Logging;
 
 using var cancellation = new CancellationTokenSource();
@@ -30,7 +30,7 @@ try
     if (apiKey is null)
     {
         Console.Error.WriteLine("Databento API key is not set. Run:");
-        Console.Error.WriteLine("  StbaFetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+        Console.Error.WriteLine("  StbadFetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
         return ExitCode.Error;
     }
 

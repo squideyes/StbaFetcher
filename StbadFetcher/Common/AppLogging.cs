@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 internal static class AppLogging
 {

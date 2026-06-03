@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.Text;
 using ZstdSharp;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 /// <summary>
 /// Reads the DBN file header + metadata section. The metadata's symbol mappings let us

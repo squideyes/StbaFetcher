@@ -1,18 +1,21 @@
 using System.Diagnostics;
 using System.Text;
-using StbaFetcher.OutputFormatters;
+using StbadFetcher.OutputFormatters;
 using Microsoft.Extensions.Logging;
 using ZstdSharp;
 
-namespace StbaFetcher;
+namespace StbadFetcher.Databento;
 
-internal sealed class DbnMbp1Converter(ILogger<DbnMbp1Converter> logger)
+/// <summary>
+/// Streams DBN <c>mbp-10</c> records (rtype 10, 368 bytes) to one or more depth emitters. Mirrors the
+/// DBN framing handled by the old MBP-1 path: an 8-byte DBN magic/version, a skipped metadata block,
+/// then fixed-size records read by their 1-byte length field.
+/// </summary>
+internal sealed class DbnMbp10Converter(ILogger<DbnMbp10Converter> logger)
 {
-    private const byte Mbp1Rtype = 1;
     private const int HeaderSize = 16;
-    private const int Mbp1RecordSize = 80;
 
-    public async Task<long> ConvertAsync(string inputPath, IReadOnlyList<IMbp1Emitter> emitters)
+    public async Task<long> ConvertAsync(string inputPath, IReadOnlyList<IDepthEmitter> emitters)
     {
         if (emitters.Count == 0) return 0;
 
@@ -46,10 +49,8 @@ internal sealed class DbnMbp1Converter(ILogger<DbnMbp1Converter> logger)
                 remaining -= toRead;
             }
 
-            var buf = new byte[256];
-            long rowCount = 0;
-            long totalRecords = 0;
-            long skippedRecords = 0;
+            var buf = new byte[512];
+            long rowCount = 0, totalRecords = 0, skippedRecords = 0;
 
             while (true)
             {
@@ -71,23 +72,13 @@ internal sealed class DbnMbp1Converter(ILogger<DbnMbp1Converter> logger)
                     stream.ReadExactly(buf.AsSpan(HeaderSize, bodyBytes));
                 totalRecords++;
 
-                if (rtype != Mbp1Rtype || totalBytes != Mbp1RecordSize)
+                if (rtype != Mbp10Record.RType || totalBytes != Mbp10Record.RecordSize)
                 {
                     skippedRecords++;
                     continue;
                 }
 
-                var record = new Mbp1Record(
-                    TsEvent: BitConverter.ToInt64(buf, 8),
-                    Price: BitConverter.ToInt64(buf, 16),
-                    Size: BitConverter.ToUInt32(buf, 24),
-                    Action: (char)buf[28],
-                    Side: (char)buf[29],
-                    BidPx: BitConverter.ToInt64(buf, 48),
-                    AskPx: BitConverter.ToInt64(buf, 56),
-                    BidSz: BitConverter.ToUInt32(buf, 64),
-                    AskSz: BitConverter.ToUInt32(buf, 68));
-
+                var record = new Mbp10Record(buf.AsSpan(0, Mbp10Record.RecordSize));
                 foreach (var em in emitters)
                     em.Emit(in record);
                 rowCount++;
@@ -108,7 +99,7 @@ internal sealed class DbnMbp1Converter(ILogger<DbnMbp1Converter> logger)
                 }
             }
 
-            logger.LogInformation("  -> {Rows:N0} MBP-1 rows ({Skipped:N0}/{Total:N0} other records skipped) in {Elapsed:F2}s",
+            logger.LogInformation("  -> {Rows:N0} MBP-10 rows ({Skipped:N0}/{Total:N0} other records skipped) in {Elapsed:F2}s",
                 rowCount, skippedRecords, totalRecords, sw.Elapsed.TotalSeconds);
             return rowCount;
         }

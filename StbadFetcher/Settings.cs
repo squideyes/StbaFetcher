@@ -1,13 +1,18 @@
 using System.Globalization;
 using SquidEyes.Pricing;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 /// <summary>Parsed command-line arguments for the DBN downloader CLI.</summary>
 internal sealed class Settings
 {
     public const string DefaultSaveTo = @"%MYDOCS%\DataBento\STBA";
     public const int DefaultThreads = 4;
+
+    // Default look-back window (trading days back from yesterday). Kept deliberately small because
+    // MBP-10 depth is billed per GB and is much heavier than MBP-1; widen consciously via --alldates
+    // or --date so a routine run can never inadvertently pull a large, expensive range.
+    public const int DefaultLookbackDays = 14;
 
     public IReadOnlyList<Symbol> Symbols { get; private init; } = [];
     public DateOnly From { get; private init; }
@@ -22,17 +27,17 @@ internal sealed class Settings
 
     public static string HelpText =>
         $$"""
-        StbaFetcher — fetch CME futures MBP-1 from Databento and emit STBA.
+        StbadFetcher — fetch CME futures MBP-10 depth from Databento and emit STBAD.
 
         For each (symbol, trade-date) the tool produces two files:
-          {Symbol}_{yyyyMMdd}_{Contract}_DB_MTH_ET.stba       (08:00..12:00 ET)
-          {Symbol}_{yyyyMMdd}_{Contract}_DB_DTH_ET.stba       (08:00..16:00 ET)
+          {Symbol}_{yyyyMMdd}_{Contract}_DB_MTH_ET.stbad      (08:00..12:00 ET)
+          {Symbol}_{yyyyMMdd}_{Contract}_DB_DTH_ET.stbad      (08:00..16:00 ET)
 
         Output is laid out as {SaveTo}/{Symbol}/{Year}/<filename>.
 
         Usage:
-          StbaFetcher --symbols <list> [options]
-          StbaFetcher --set-key <db-...>
+          StbadFetcher --symbols <list> [options]
+          StbadFetcher --set-key <db-...>
 
         Required:
           --symbols <list>   Comma-separated root symbols (ES, NQ, CL, GC, TY, FV, US, JY, EU, BP),
@@ -40,8 +45,10 @@ internal sealed class Settings
                              'ALL,NQ' are deduped. Continuous front month (.c.0) is implied.
 
         Options:
+          --date <date>      Fetch a single ET trade date (yyyy-MM-dd). Overrides the date window;
+                             handy for a cheap, precise test fetch or a targeted refetch.
           --alldates         Fetch from the earliest supported trade date instead of the default
-                             360-day window (Databento bills per GB — use deliberately).
+                             {{DefaultLookbackDays}}-day window (MBP-10 bills per GB — use deliberately).
           --saveto <folder>  Output folder. Default: {{DefaultSaveTo}}
                              Supports tokens: %MYDOCS%, %DESKTOP%, %USERPROFILE%, %LOCALAPPDATA%,
                              plus any defined environment variable.
@@ -55,17 +62,17 @@ internal sealed class Settings
           --help, -h         Show this help.
 
         The fetch always runs up to yesterday's trade date (ET). By default the start is the
-        first trade date on or after (yesterday − 360 days), keeping the window safely below
-        any rolling-12-month quota; pass --alldates to start at the earliest supported trade
-        date instead.
+        first trade date on or after (yesterday − {{DefaultLookbackDays}} days) — deliberately
+        small because MBP-10 is billed per GB. Reach further back consciously with --alldates
+        (earliest supported date) or --date (a single trade date).
 
         The API key is stored in Windows Credential Manager (Generic credential
         '{{SecretStore.TargetName}}', DPAPI-protected, per Windows user). Set it once with:
-          StbaFetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          StbadFetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
         Examples:
-          StbaFetcher --symbols ALL
-          StbaFetcher --symbols ES,NQ --alldates
+          StbadFetcher --symbols ALL
+          StbadFetcher --symbols ES,NQ --alldates
         """;
 
     /// <exception cref="ArgumentException">An argument is missing, unknown, or malformed.</exception>
@@ -79,6 +86,7 @@ internal sealed class Settings
         string? threads = null;
         string? maxDates = null;
         string? setKey = null;
+        string? singleDate = null;
         var all = false;
         var overwrite = false;
         var verbose = false;
@@ -92,6 +100,7 @@ internal sealed class Settings
                 case "--saveto": saveTo = NextValue(args, ref i, key); break;
                 case "--threads": threads = NextValue(args, ref i, key); break;
                 case "--max-dates": maxDates = NextValue(args, ref i, key); break;
+                case "--date": singleDate = NextValue(args, ref i, key); break;
                 case "--alldates": all = true; break;
                 case "--overwrite": overwrite = true; break;
                 case "--verbose": verbose = true; break;
@@ -115,6 +124,29 @@ internal sealed class Settings
         var until = EasternTime.TodayEt().LatestTradeDateBefore();
         var earliest = DateOnlyExtenders.EarliestTradeDate();
 
+        if (singleDate is not null)
+        {
+            if (all)
+                throw new ArgumentException("--date cannot be combined with --alldates.");
+            if (!DateOnly.TryParseExact(singleDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var one))
+                throw new ArgumentException($"--date must be yyyy-MM-dd, got '{singleDate}'.");
+            if (!one.IsTradeDate())
+                throw new ArgumentException($"--date {one:yyyy-MM-dd} is not a valid ET trade date.");
+
+            return new Settings
+            {
+                Symbols = parsedSymbols,
+                From = one,
+                Until = one,
+                SaveTo = PathTokens.Expand(string.IsNullOrWhiteSpace(saveTo) ? DefaultSaveTo : saveTo),
+                Threads = threads is null ? DefaultThreads : ParseThreads(threads),
+                MaxDates = maxDates is null ? null : ParsePositiveInt(maxDates, "--max-dates"),
+                Overwrite = overwrite,
+                Verbose = verbose,
+            };
+        }
+
         DateOnly from;
         if (all)
         {
@@ -122,11 +154,11 @@ internal sealed class Settings
         }
         else
         {
-            // Anchor a 360-day window on yesterday's trade date (5 days under a calendar
-            // year, to stay safely below any rolling-12-month quota even in leap years)
-            // and snap forward to a valid trade date; clamp to the earliest supported
-            // date when the anchor predates the calendar.
-            var anchor = until.AddDays(-360);
+            // MBP-10 is billed per GB and is far heavier than MBP-1, so the default window is
+            // intentionally tiny — the last DefaultLookbackDays days only — to avoid inadvertent
+            // large charges during development. Reach further back deliberately with --alldates
+            // (everything) or --date (one day). Snap forward to a trade date; clamp to earliest.
+            var anchor = until.AddDays(-DefaultLookbackDays);
             from = anchor < earliest ? earliest : anchor;
             while (from <= until && !from.IsTradeDate())
                 from = from.AddDays(1);

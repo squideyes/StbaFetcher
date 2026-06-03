@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);NU1903;NU1603</NoWarn>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <RootNamespace>StbadFetcher</RootNamespace>
+    <AssemblyName>StbadFetcher</AssemblyName>
+
+    <!-- Pack as a .NET global tool. `dotnet pack` produces a .nupkg that users install with
+         `dotnet tool install -g SquidEyes.StbadFetcher`, exposing a `stbadfetcher` command on PATH. -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>stbadfetcher</ToolCommandName>
+    <PackageId>SquidEyes.StbadFetcher</PackageId>
+    <Title>StbadFetcher</Title>
+    <Version>1.0.0</Version>
+    <Authors>SquidEyes</Authors>
+    <Description>CLI for fetching CME futures MBP-10 depth from Databento and emitting STBAD for the MTH (08:00-12:00 ET) and DTH (08:00-16:00 ET) sessions.</Description>
+    <PackageTags>databento;futures;cme;mbp-10;stbad;depth;cli;market-data</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.8" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Local project reference to pick up the new .stbad depth format (StbadEncoder etc.).
+         Switch back to <PackageReference Include="SquidEyes.Pricing" Version="2.1.0" /> once a
+         package containing the Stbad format is published. -->
+    <ProjectReference Include="..\..\SquidEyes.Pricing\SquidEyes.Pricing\src\SquidEyes.Pricing\SquidEyes.Pricing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="StbadFetcher.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,8 +1,8 @@
-# StbaFetcher
+# StbadFetcher
 
-A small .NET 10 / C# 14 CLI that downloads CME futures **MBP-1** data from Databento and
-converts it into **STBA** (Squideyes Trade/Bid/Ask, binary) for both the **MTH** and **DTH**
-sessions on each requested trade date.
+A small .NET 10 / C# 14 CLI that downloads CME futures **MBP-10** depth data from Databento and
+converts it into **STBAD** (STBA + Depth, binary) for both the **MTH** and **DTH**
+sessions on each requested trade date. Every `.stbad` carries the full 10-level book on both sides.
 
 This is a SquidEyes-internal utility. The defaults — CME Globex only, continuous front month,
 ET trade dates, MTH (08:00–12:00) and DTH (08:00–16:00) windows — reflect our own backtest
@@ -18,19 +18,21 @@ scope-broadening change requests may be politely declined if they don't fit our 
 For every `(symbol, trade-date)` in the requested range the tool produces **two** files:
 
 ```text
-{Symbol}_{yyyyMMdd}_{Contract}_DB_MTH_ET.stba         # 08:00..12:00 ET, binary
-{Symbol}_{yyyyMMdd}_{Contract}_DB_DTH_ET.stba         # 08:00..16:00 ET, binary
+{Symbol}_{yyyyMMdd}_{Contract}_DB_MTH_ET.stbad        # 08:00..12:00 ET, binary depth
+{Symbol}_{yyyyMMdd}_{Contract}_DB_DTH_ET.stbad        # 08:00..16:00 ET, binary depth
 ```
 
 …organised as `{SaveTo}/{Symbol}/{Year}/<filename>` — e.g.
-`%MYDOCS%\DataBento\STBA\ES\2026\ES_20260514_M26_DB_MTH_ET.stba`.
+`%MYDOCS%\DataBento\STBA\ES\2026\ES_20260514_M26_DB_MTH_ET.stbad`.
 
-Default behaviour is to **fetch every missing trade date in the last 360 days up to yesterday**
-for each requested symbol — Databento bills per GB, and the 360-day window keeps casual
-backfills cheap while staying safely under any rolling-12-month quota. Pass `--alldates` to
-widen the window to the earliest supported trade date.
+Default behaviour is to **fetch every missing trade date in the last 14 days up to yesterday**
+for each requested symbol. The window is deliberately small because **MBP-10 depth is billed per
+GB** and is far heavier than MBP-1, so a routine run can't inadvertently pull a large, expensive
+range. Reach further back consciously with `--alldates` (earliest supported date) or
+`--date yyyy-MM-dd` (a single trade date).
 A `(symbol, date)` whose two outputs already exist is skipped without issuing a (billed)
-batch request. Pass `--overwrite` to force a refetch.
+batch request. Pass `--overwrite` to force a refetch. Pass `--date yyyy-MM-dd` to fetch a single
+ET trade date (a cheap, precise test fetch or targeted refetch).
 
 Internally each batch request covers the wider DTH window; a single DBN parse feeds both
 session accumulators. The `.dbn.zst` source file is deleted after a successful conversion.
@@ -44,40 +46,40 @@ session accumulators. The `.dbn.zst` source file is deleted after a successful c
 
 ## Install
 
-StbaFetcher ships as a [.NET global tool](https://learn.microsoft.com/dotnet/core/tools/global-tools)
+StbadFetcher ships as a [.NET global tool](https://learn.microsoft.com/dotnet/core/tools/global-tools)
 on nuget.org, so installation is a single command from any shell:
 
 ```pwsh
-dotnet tool install -g SquidEyes.StbaFetcher
+dotnet tool install -g SquidEyes.StbadFetcher
 ```
 
-This puts a `stbafetcher` command on PATH (under `%USERPROFILE%\.dotnet\tools\` on
+This puts a `stbadfetcher` command on PATH (under `%USERPROFILE%\.dotnet\tools\` on
 Windows). Upgrade or uninstall later with:
 
 ```pwsh
-dotnet tool update    -g SquidEyes.StbaFetcher
+dotnet tool update    -g SquidEyes.StbadFetcher
 dotnet tool list      -g
-dotnet tool uninstall -g SquidEyes.StbaFetcher
+dotnet tool uninstall -g SquidEyes.StbadFetcher
 ```
 
 ## Quickstart
 
 ```pwsh
 # one-time setup, per Windows user (stored in Windows Credential Manager)
-stbafetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+stbadfetcher --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # fetch the last year of missing trade dates for ES and NQ, up to yesterday
-stbafetcher --symbols ES,NQ
+stbadfetcher --symbols ES,NQ
 
 # fetch every supported symbol (ALL expands the enum; dedupes against any extras)
-stbafetcher --symbols ALL
+stbadfetcher --symbols ALL
 
 # go all the way back to the earliest supported trade date (bills per GB)
-stbafetcher --symbols ES --alldates
+stbadfetcher --symbols ES --alldates
 ```
 
 `--set-key` stores the value in **Windows Credential Manager** as the Generic credential
-`StbaFetcher:DATABENTO_API_KEY`. Credential Manager DPAPI-encrypts the blob under the
+`StbadFetcher:DATABENTO_API_KEY`. Credential Manager DPAPI-encrypts the blob under the
 current Windows user, so it never lands on disk in this app's own folders. You can see /
 remove it via *Control Panel → Credential Manager → Windows Credentials*.
 
@@ -86,7 +88,8 @@ remove it via *Control Panel → Credential Manager → Windows Credentials*.
 | Option        | Description                                                                  | Default                     |
 |---------------|------------------------------------------------------------------------------|-----------------------------|
 | `--symbols`   | Comma-separated root symbols, or `ALL`. Continuous front month is implied.   | *(required)*                |
-| `--alldates`  | Fetch from the earliest supported trade date instead of the 360-day default. | *(off)*                     |
+| `--date`      | Fetch a single ET trade date (`yyyy-MM-dd`); overrides the date window.       | *(off)*                     |
+| `--alldates`  | Fetch from the earliest supported trade date instead of the 14-day default.  | *(off)*                     |
 | `--saveto`    | Output folder. Supports path tokens (see below).                             | `%MYDOCS%\DataBento\STBA`   |
 | `--threads`   | Concurrent file downloads per batch job.                                     | `4`                         |
 | `--max-dates` | Cap this run at N pending dates (oldest first), then exit. Re-run to resume. | *(unlimited)*               |
@@ -100,10 +103,10 @@ remove it via *Control Panel → Credential Manager → Windows Credentials*.
 mixed lists like `ALL,NQ` are deduped. Anything else fails fast at argument parsing.
 
 **Date range.** The fetch always ends at yesterday's ET trade date. By default the start
-is the first valid trade date on or after `(yesterday − 360 days)` — 5 days under a calendar
-year, so the window stays safely below any rolling-12-month quota even in leap years. With
-`--alldates` it falls back to the earliest supported trade date
-(`SquidEyes.Pricing.Session.MinDate`, snapped forward to a trade date).
+is the first valid trade date on or after `(yesterday − 14 days)` — deliberately small so a
+routine run can't run up a large MBP-10 bill. Reach further back consciously with `--alldates`
+(the earliest supported trade date, `SquidEyes.Pricing.Session.MinDate`, snapped forward) or
+`--date yyyy-MM-dd` (a single trade date).
 
 ### `--saveto` path tokens
 
@@ -121,24 +124,26 @@ Anything else falls through to `Environment.ExpandEnvironmentVariables`, so real
 (`%TEMP%`, `%APPDATA%`, ...) also work. Unknown tokens fail at startup rather than producing
 a weird folder name.
 
-## STBA
+## STBAD
 
-The output format carries deduped Bid/Ask updates plus every Trade, sorted, with
-sequential same-`(ms, kind, price)` rows merged into a summed-volume row.
+The output format carries the **resulting top-10 book** (slot-overwrite) on both sides plus every
+Trade, in source order. Each MBP-10 record's ladders are diffed against the running book and surface
+as quote (slot-overwrite) events; trades print separately as hit/lift events.
 
-- **STBA** — binary. Bit-packed time/kind, zig-zag varint price deltas, Brotli-compressed.
-  Encoder/decoder live in `SquidEyes.Pricing.Stba`. Roughly 10× smaller than Parquet for
-  tick-level futures data.
+- **STBAD** — binary depth. Per-block keyframe + delta events; zig-zag varint price/size/count deltas
+  and a changed-slot bitmap; Brotli-compressed per block; footer seek index + CRC-32C. Encoder/decoder
+  live in `SquidEyes.Pricing.Stbad`. Expect ~5–15× larger than the old L1-only `.stba` before
+  compression — the accepted cost of permanent depth.
 
 ## Project layout
 
-This is a **single-project solution**: `StbaFetcher/` under the solution root holds the
+This is a **single-project solution**: `StbadFetcher/` under the solution root holds the
 project, which is both the library and the executable. Pricing primitives (`EasternTime`,
 the trade-date calendar, the STBA encoder, etc.) come from the local `..\SquidEyes.Pricing\`
 project reference until the next NuGet release ships them.
 
 ```text
-StbaFetcher/
+StbadFetcher/
   Program.cs                          # ~60 lines: arg parse, secret load, dispatch
   Settings.cs                         # CLI parser
   Common/
@@ -149,15 +154,16 @@ StbaFetcher/
   Databento/
     DatabentoApi.cs                   # timeseries.get_range (streaming) + symbology.resolve
     DatabentoHttpClient.cs            # HTTP client with Basic auth, infinite timeout
-    DbnMbp1Converter.cs               # streams MBP-1 records to N emitters
+    DbnMbp10Converter.cs              # streams MBP-10 records (rtype 10, 368 bytes) to N emitters
+    Mbp10Record.cs                    # zero-alloc ref-struct view over one DBN MBP-10 record
     DbnMetadataReader.cs              # DBN v1/v2/v3 metadata parser
     JsonOptions.cs
   Pipeline/
     OutputPaths.cs                    # {SaveTo}/{Symbol}/{Year}/ + canonical filename
     TickDataDownloader.cs             # main orchestrator
   OutputFormatters/
-    IMbp1Emitter.cs, Mbp1Record.cs, Mbp1TickAccumulator.cs
-    StbaEmitter.cs
+    IDepthEmitter.cs, Mbp10DepthAccumulator.cs
+    StbadEmitter.cs
 ```
 
 ## Building from source
@@ -173,16 +179,16 @@ dotnet build
 
 # API key for source runs — the built exe accepts --set-key just like the global tool
 # and writes to the same Credential Manager entry. One-time setup per Windows user:
-dotnet run --project StbaFetcher -- --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+dotnet run --project StbadFetcher -- --set-key db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # run directly from the solution root:
-dotnet run --project StbaFetcher -- --symbols ES,NQ
+dotnet run --project StbadFetcher -- --symbols ES,NQ
 
-# produce the global-tool package locally (output: StbaFetcher/bin/Release/*.nupkg):
-dotnet pack StbaFetcher -c Release
+# produce the global-tool package locally (output: StbadFetcher/bin/Release/*.nupkg):
+dotnet pack StbadFetcher -c Release
 
 # install your local build into the global tool store for end-to-end testing:
-dotnet tool install -g --add-source ./StbaFetcher/bin/Release SquidEyes.StbaFetcher
+dotnet tool install -g --add-source ./StbadFetcher/bin/Release SquidEyes.StbadFetcher
 ```
 
 ## Notes on the Databento API
@@ -192,8 +198,8 @@ dotnet tool install -g --add-source ./StbaFetcher/bin/Release SquidEyes.StbaFetc
   within seconds. The batch (`submit_job` / `list_jobs` / `list_files`) endpoints aren't used;
   the streaming path is simpler, removes the submit-then-poll latency, and gives the same
   raw data.
-- Up to `--threads` requests (default `4`) run in parallel; the 360-day default window over
-  3 symbols at parallelism 4 saturates a typical residential downlink without tripping
+- Up to `--threads` requests (default `4`) run in parallel; even the small default window over
+  a few symbols at parallelism 4 saturates a typical residential downlink without tripping
   Databento's rate limits in practice.
 - Transient HTTP failures (408, 429, 500, 502, 503, 504) are retried up to 3× with backoff,
   honoring `Retry-After`. Non-transient errors throw immediately.
@@ -206,9 +212,10 @@ dotnet tool install -g --add-source ./StbaFetcher/bin/Release SquidEyes.StbaFetc
 
 ## Cost notes
 
-Databento bills per GB downloaded. The default 360-day window for the default symbol set is
-about 100 GB of compressed MBP-1; budget accordingly. Use `--max-dates N` for incremental
-runs, or `--symbols ES` (single symbol) to size-check before a wide backfill.
+Databento bills per GB downloaded. **MBP-10 is much larger than MBP-1** (the full 10-level book on
+every record), so budget several times the old footprint for the same window. Use
+`--date yyyy-MM-dd` or `--max-dates N` for incremental runs, or `--symbols ES` (single symbol) to
+size-check before a wide backfill.
 
 ## License
 

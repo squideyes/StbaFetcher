@@ -1,7 +1,7 @@
 using System.Globalization;
 using SquidEyes.Pricing;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 /// <summary>
 /// Resolves the on-disk layout for converted output files. All artifacts for a
@@ -13,12 +13,12 @@ internal static class OutputPaths
     public static string Directory(string saveTo, Symbol symbol, DateOnly date) =>
         Path.Combine(saveTo, symbol.ToString(), date.Year.ToString(CultureInfo.InvariantCulture));
 
-    public static string StbaPath(string saveTo, Symbol symbol, DateOnly date, Contract contract, SessionKind session) =>
+    public static string StbadPath(string saveTo, Symbol symbol, DateOnly date, Contract contract, SessionKind session) =>
         Path.Combine(Directory(saveTo, symbol, date),
-            PricingFile.BuildStem(symbol, date, contract, Source.DataBento, session) + ".stba");
+            PricingFile.BuildStem(symbol, date, contract, Source.DataBento, session) + ".stbad");
 
     /// <summary>
-    /// True iff both MTH and DTH .stba files for <paramref name="symbol"/> on
+    /// True iff both MTH and DTH .stbad files for <paramref name="symbol"/> on
     /// <paramref name="date"/> already exist (under any contract suffix). Used to skip
     /// already-fetched <c>(symbol, date)</c> pairs without issuing a billed batch request.
     /// </summary>
@@ -35,7 +35,7 @@ internal static class OutputPaths
 
     private static bool SessionCovered(string dir, Symbol symbol, string datePart, string sourcePart, SessionKind session)
     {
-        var glob = $"{symbol}_{datePart}_*_{sourcePart}_{session.ToCode()}_ET.stba";
+        var glob = $"{symbol}_{datePart}_*_{sourcePart}_{session.ToCode()}_ET.stbad";
         return System.IO.Directory.EnumerateFiles(dir, glob).Any();
     }
 }

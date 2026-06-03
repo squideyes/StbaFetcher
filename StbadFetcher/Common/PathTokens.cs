@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 internal static partial class PathTokens
 {

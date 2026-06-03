@@ -1,15 +1,16 @@
 using System.Diagnostics;
 using System.Globalization;
-using StbaFetcher.OutputFormatters;
+using StbadFetcher.Databento;
+using StbadFetcher.OutputFormatters;
 using Microsoft.Extensions.Logging;
 using SquidEyes.Pricing;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 /// <summary>
 /// Top-level pipeline: enumerate trade dates × requested symbols, then for each
 /// <c>(symbol, date)</c> still missing on disk, stream <c>timeseries.get_range</c>
-/// straight to a staging file, parse the DBN, convert to <c>STBA</c> for both the
+/// straight to a staging file, parse the DBN, convert to <c>STBAD</c> (MBP-10 depth) for both the
 /// <c>MTH</c> and <c>DTH</c> sessions, and delete the source. Up to
 /// <see cref="Settings.Threads"/> requests run in parallel; the first files land on
 /// disk within seconds of pressing Enter.
@@ -17,7 +18,7 @@ namespace StbaFetcher;
 internal sealed class TickDataDownloader
 {
     private const string Dataset = "GLBX.MDP3";
-    private const string Schema = "mbp-1";
+    private const string Schema = "mbp-10";
     private const string STypeIn = "continuous";
     private const string STypeOut = "instrument_id";
 
@@ -74,7 +75,7 @@ internal sealed class TickDataDownloader
 
         // Staging lives in the OS temp dir, not inside SaveTo — keeps the user's
         // output folder clean and lets the OS reclaim leaked files if we crash.
-        var stagingDir = Path.Combine(Path.GetTempPath(), "StbaFetcher");
+        var stagingDir = Path.Combine(Path.GetTempPath(), "StbadFetcher");
         Directory.CreateDirectory(stagingDir);
 
         var totalTimer = Stopwatch.StartNew();
@@ -116,13 +117,14 @@ internal sealed class TickDataDownloader
         return plan;
     }
 
-    // A converted output: how many MBP-1 rows landed, and the two STBA file paths
+    // A converted output: how many MBP-10 rows landed, and the two STBAD file paths
     // (Empty path strings when Ok=false, i.e. the DBN had no symbol mapping).
     private readonly record struct ConvertResult(bool Ok, long Rows, string MthPath, string DthPath);
 
     // Below this row count, the contract is presumed dying and we auto-probe .v.1.
-    // The smallest legitimate full-session day in our sample data (a thin CL day)
-    // was ~120K rows; a clearly dying contract is always <50K. 100K is the safe gap.
+    // NOTE: this threshold was calibrated on MBP-1 row counts; MBP-10 emits many more
+    // records per session, so the "thin" gap likely wants re-tuning against real depth
+    // data (a dying contract will still be proportionally tiny, just at a higher floor).
     private const int ThinRowThreshold = 100_000;
 
     // The .v.1 result must be this many times bigger than .v.0 to be preferred —
@@ -218,19 +220,19 @@ internal sealed class TickDataDownloader
         var (symbol, contract) = resolved.Value;
         Directory.CreateDirectory(OutputPaths.Directory(_settings.SaveTo, symbol, date));
 
-        var mthPath = OutputPaths.StbaPath(_settings.SaveTo, symbol, date, contract, SessionKind.MTH);
-        var dthPath = OutputPaths.StbaPath(_settings.SaveTo, symbol, date, contract, SessionKind.DTH);
+        var mthPath = OutputPaths.StbadPath(_settings.SaveTo, symbol, date, contract, SessionKind.MTH);
+        var dthPath = OutputPaths.StbadPath(_settings.SaveTo, symbol, date, contract, SessionKind.DTH);
 
-        var emitters = new List<IMbp1Emitter>
+        var emitters = new List<IDepthEmitter>
         {
-            new StbaEmitter(mthPath, symbol, contract, date, SessionKind.MTH),
-            new StbaEmitter(dthPath, symbol, contract, date, SessionKind.DTH),
+            new StbadEmitter(mthPath, symbol, contract, date, SessionKind.MTH),
+            new StbadEmitter(dthPath, symbol, contract, date, SessionKind.DTH),
         };
 
         long rows;
         try
         {
-            var converter = new DbnMbp1Converter(AppLogging.CreateLogger<DbnMbp1Converter>());
+            var converter = new DbnMbp10Converter(AppLogging.CreateLogger<DbnMbp10Converter>());
             rows = await converter.ConvertAsync(dbnPath, emitters).ConfigureAwait(false);
         }
         finally

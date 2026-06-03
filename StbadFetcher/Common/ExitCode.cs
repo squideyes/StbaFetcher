@@ -1,4 +1,4 @@
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 /// <summary>Process exit codes returned by <c>Program.Main</c>.</summary>
 internal static class ExitCode

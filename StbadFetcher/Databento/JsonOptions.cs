@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 internal static class JsonOptions
 {

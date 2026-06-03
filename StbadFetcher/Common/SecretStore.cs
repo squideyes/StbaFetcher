@@ -2,19 +2,19 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 /// <summary>
 /// Reads/writes the Databento API key in <b>Windows Credential Manager</b> (Generic
 /// credential, <c>CRED_PERSIST_LOCAL_MACHINE</c>). The blob is DPAPI-encrypted by the OS
 /// and bound to the current Windows user — nothing is written to disk by this app.
 /// Show up in Control Panel → Credential Manager → Windows Credentials as
-/// <c>StbaFetcher:DATABENTO_API_KEY</c>.
+/// <c>StbadFetcher:DATABENTO_API_KEY</c>.
 /// </summary>
 internal static class SecretStore
 {
     public const string ApiKeyName = "DATABENTO_API_KEY";
-    public const string TargetName = "StbaFetcher:DATABENTO_API_KEY";
+    public const string TargetName = "StbadFetcher:DATABENTO_API_KEY";
 
     public static string? ReadApiKey()
     {

@@ -1,10 +1,10 @@
-# Contributing to StbaFetcher
+# Contributing to StbadFetcher
 
 Thanks for your interest. A few things to know before you sink time into a patch.
 
 ## About this project
 
-StbaFetcher is a SquidEyes project. It was built to serve a specific data-pipeline
+StbadFetcher is a SquidEyes project. It was built to serve a specific data-pipeline
 workflow — Databento **MBP-1** for **CME futures**, partitioned by **ET trade date**,
 emitting both the **MTH** (08:00–12:00 ET) and **DTH** (08:00–16:00 ET) sessions to
 the compact **STBA** binary format. Almost every default in the CLI reflects that
@@ -37,7 +37,7 @@ You'll need:
   `advapi32!CredRead/CredWrite/CredDelete`. The project builds on non-Windows but
   any call into `SecretStore` will fail at runtime there.
 - **An editor** — Visual Studio 2026+, JetBrains Rider, or VS Code with the C# Dev
-  Kit all work. The repo uses an XML-format solution file (`StbaFetcher.slnx`), which
+  Kit all work. The repo uses an XML-format solution file (`StbadFetcher.slnx`), which
   modern Visual Studio and Rider open natively.
 
 You do **not** need a Databento API key to build the project. A key is only needed to
@@ -47,18 +47,18 @@ run the CLI against the live API end-to-end.
 
 ```pwsh
 git clone <repo-url>
-cd StbaFetcher
+cd StbadFetcher
 ```
 
-`StbaFetcher` currently depends on a local project reference to `..\SquidEyes.Pricing\`
-(see [`StbaFetcher/StbaFetcher.csproj`](./StbaFetcher/StbaFetcher.csproj)) until the
+`StbadFetcher` currently depends on a local project reference to `..\SquidEyes.Pricing\`
+(see [`StbadFetcher/StbadFetcher.csproj`](./StbadFetcher/StbadFetcher.csproj)) until the
 required helpers (`EasternTime`, the trade-date calendar, the STBA encoder,
 `PricingFile`, etc.) ship in a public `SquidEyes.Pricing` NuGet release. To build from
 source, clone `SquidEyes.Pricing` as a sibling directory:
 
 ```text
 Desktop/
-  StbaFetcher/         <-- this repo
+  StbadFetcher/         <-- this repo
   SquidEyes.Pricing/   <-- sibling clone of https://github.com/squideyes/SquidEyes.Pricing
 ```
 
@@ -72,7 +72,7 @@ dotnet build
 ```
 
 Everything should build with **zero warnings** (the project has
-`TreatWarningsAsErrors=true` in [`StbaFetcher/StbaFetcher.csproj`](./StbaFetcher/StbaFetcher.csproj))
+`TreatWarningsAsErrors=true` in [`StbadFetcher/StbadFetcher.csproj`](./StbadFetcher/StbadFetcher.csproj))
 and **zero errors**. If anything fails on a clean checkout, stop and open an issue
 before changing anything — that's a bug in `main`, not something for your PR to
 inherit.
@@ -84,7 +84,7 @@ exercised end-to-end against the live Databento API.
 
 If your PR changes anything non-trivial — a parser, the trade-date math, the output
 filename conventions, the STBA accumulator — please bring an xUnit test project with
-it (`tests/StbaFetcher.UnitTests/`). Use plain **xUnit** (`[Fact]`, `[Theory]`,
+it (`tests/StbadFetcher.UnitTests/`). Use plain **xUnit** (`[Fact]`, `[Theory]`,
 `Assert.Equal`, etc.). We do **not** use FluentAssertions, NSubstitute, or Moq; please
 match the existing SquidEyes house style rather than introducing a new assertion or
 mocking library in your PR.
@@ -95,16 +95,16 @@ You only need this if you want to actually hit Databento from the CLI. Most
 contributors won't.
 
 The CLI persists the key in **Windows Credential Manager** as the Generic credential
-`StbaFetcher:DATABENTO_API_KEY`. Credential Manager DPAPI-encrypts the blob under the
+`StbadFetcher:DATABENTO_API_KEY`. Credential Manager DPAPI-encrypts the blob under the
 current Windows user — nothing is written to disk by this app. Set it once via the
 built exe:
 
 ```pwsh
-dotnet run --project StbaFetcher -- --set-key db-...
+dotnet run --project StbadFetcher -- --set-key db-...
 ```
 
 Once the global tool is installed, the equivalent invocation is
-`stbafetcher --set-key db-...` and writes to the same credential. Inspect or delete
+`stbadfetcher --set-key db-...` and writes to the same credential. Inspect or delete
 it via *Control Panel → Credential Manager → Windows Credentials*.
 
 Neither environment variables nor `dotnet user-secrets` are consulted — the
@@ -119,12 +119,12 @@ Before you start writing code, read these in order:
 
 1. [`README.md`](./README.md) — what the CLI does, how to invoke it, and the
    project layout.
-2. [`StbaFetcher/Pipeline/TickDataDownloader.cs`](./StbaFetcher/Pipeline/TickDataDownloader.cs) —
+2. [`StbadFetcher/Pipeline/TickDataDownloader.cs`](./StbadFetcher/Pipeline/TickDataDownloader.cs) —
    the orchestrator and the heart of the design (submit → poll → download → convert).
-3. [`StbaFetcher/Databento/DbnMbp1Converter.cs`](./StbaFetcher/Databento/DbnMbp1Converter.cs)
-   and [`StbaFetcher/OutputFormatters/`](./StbaFetcher/OutputFormatters/) — how
+3. [`StbadFetcher/Databento/DbnMbp1Converter.cs`](./StbadFetcher/Databento/DbnMbp1Converter.cs)
+   and [`StbadFetcher/OutputFormatters/`](./StbadFetcher/OutputFormatters/) — how
    raw MBP-1 records become STBA + STBA.CSV.
-4. [`StbaFetcher/Settings.cs`](./StbaFetcher/Settings.cs) — the CLI surface, the
+4. [`StbadFetcher/Settings.cs`](./StbadFetcher/Settings.cs) — the CLI surface, the
    one-year default-date window, the `ALL` symbol expansion.
 
 ## Code style
@@ -135,7 +135,7 @@ Before you start writing code, read these in order:
 - **Nullable reference types are enabled.** No `#nullable disable`. If the compiler
   warns about a null, fix the model, don't suppress.
 - **Warnings are errors.** `TreatWarningsAsErrors=true` is set in
-  [`StbaFetcher/StbaFetcher.csproj`](./StbaFetcher/StbaFetcher.csproj). Fix the root
+  [`StbadFetcher/StbadFetcher.csproj`](./StbadFetcher/StbadFetcher.csproj). Fix the root
   cause; don't suppress with `#pragma` unless there's a documented reason (the
   Credential Manager P/Invoke block in `SecretStore.cs` is the only such exception
   today).

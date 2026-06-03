@@ -4,7 +4,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace StbaFetcher;
+namespace StbadFetcher;
 
 /// <summary>
 /// Thin wrapper over Databento's synchronous historical HTTP API. Two operations:
